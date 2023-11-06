@@ -1,0 +1,518 @@
+---
+title: "Classifying Bird Species Sounds from Seattle"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-05-14"
+---
+```{r}
+library(keras)
+library(tensorflow)
+library(tuneR)
+library(abind)
+library(dplyr)
+```
+
+
+
+Binary :
+
+Loading in two birds:
+```{r}
+#Black-capped Chickadee
+bkcchi <- load("~/DATA 5322/spectrograms/bkcchi.dat")
+bkcchi = species 
+#Northern Flicker 
+norfli <- load("~/DATA 5322/spectrograms/norfli.dat")
+norfli = species 
+```
+
+```{r}
+dim(bkcchi)
+dim(norfli)
+```
+
+Binary model setting up:
+
+
+```{r}
+# Concatenate the spectrograms along the first dimension (rows)
+x <- abind(bkcchi, norfli, along = 1)
+y <- c(rep('bkcchi',dim(bkcchi)[1]),rep('norfli',dim(norfli)[1]))
+# Reshape the data arrays
+x<- array_reshape(x,c(nrow(x),87808))
+y_factor <- factor(y,levels=c('bkcchi','norfli'))
+y_encode <- to_categorical(as.integer(y_factor)-1,num_classes = 2)
+```
+
+```{r}
+# Set a seed for reproducibility
+set.seed(42)
+
+# Generate random indices for the train and test sets
+n <- nrow(x)
+train_idx <- sample(n, floor(0.8 * n))
+
+# Split the data into training and test sets
+x_train <- x[train_idx, ]
+y_train <- y_encode[train_idx, ]
+x_test <- x[-train_idx, ]
+y_test <- y_encode[-train_idx, ]
+
+```
+```{r}
+#x_train <- x_train / 255
+#x_test <- x_test / 255
+```
+
+```{r}
+# Define the neural network architecture
+model <- keras_model_sequential()
+model %>% 
+  layer_dense(units = 256, activation = "relu",
+       input_shape = c(87808)) %>%
+   layer_dropout(rate = 0.4) %>%
+   layer_dense(units = 128, activation = "relu") %>%
+   layer_dropout(rate = 0.3) %>%
+   layer_dense(units = 2, activation = "softmax")
+
+```
+
+```{r}
+# Compile the model
+model %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = "adam",
+  metrics = c("accuracy")
+)
+```
+
+```{r}
+system.time(
+   history <- model %>%
+#     fit(x_train, y_train, epochs = 30, batch_size = 128,
+      fit(x_train, y_train, epochs = 10, batch_size = 128,
+        validation_split = 0.2)
+ )
+plot(history, smooth = FALSE)
+```
+```{r}
+plot(history)
+```
+```{r}
+system.time(
+   history <- model %>%
+#     fit(x_train, y_train, epochs = 30, batch_size = 128,
+      fit(x_train, y_train, epochs = 20, batch_size = 128,
+        validation_split = 0.2)
+ )
+plot(history, smooth = FALSE)
+```
+```{r}
+plot(history)
+```
+
+
+```{r}
+# Evaluate the model on the test data
+metrics <- model %>% evaluate(x_test, y_test)
+
+# Extract the accuracy metric
+accuracy <- metrics[[2]]
+accuracy
+# Calculate test error
+test_error <- 1 - accuracy
+test_error
+```
+```{r}
+# Create a custom plot
+plot(history$metrics$loss, type = "l", col = "pink", xlab = "Epoch", ylab = "Loss", ylim = c(0, max(history$metrics$loss, history$metrics$val_loss)))
+lines(history$metrics$val_loss, col = "green")
+legend("topright", legend = c("Training Loss", "Validation Loss"), col = c("pink", "green"), lty = 1)
+
+# Add a title
+title(main = "Training and Validation Metrics for two bird species")
+# Create a custom plot for accuracy
+plot(history$metrics$accuracy, type = "l", col = "pink", xlab = "Epoch", ylab = "Accuracy", ylim = c(0, max(history$metrics$accuracy, history$metrics$val_accuracy)))
+lines(history$metrics$val_accuracy, col = "green")
+legend("bottomright", legend = c("Training Accuracy", "Validation Accuracy"), col = c("pink", "green"), lty = 1)
+
+# Add a title
+title(main = "Training and Validation Accuracy for two bird species")
+
+```
+
+```{r}
+# Make predictions on the test dataset
+y_pred_probs <- predict(model, x_test)
+y_pred <- apply(y_pred_probs, 1, which.max)
+
+# Convert the predicted classes into species labels
+species_labels <- c( "bkcchi","norfli")
+predicted_species <- species_labels[y_pred]
+
+# Convert the true test labels to categorical labels
+true_species <- factor(max.col(y_test) - 1, levels = 0:(length(species_labels)-1), labels = species_labels)
+
+# Calculate accuracy for each species
+accuracy <- rep(0, length(species_labels))
+for (i in 1:length(species_labels)) {
+  accuracy[i] <- sum(predicted_species[true_species == species_labels[i]] == species_labels[i]) / sum(true_species == species_labels[i])
+}
+
+# Print accuracy for each species
+for (i in 1:length(species_labels)) {
+  cat("Accuracy for", species_labels[i], ":", accuracy[i], "\n")
+}
+
+```
+
+
+Changing dropout layer:
+```{r}
+# Define the neural network architecture
+modelnew <- keras_model_sequential()
+modelnew %>% 
+  layer_dense(units = 256, activation = "relu",
+       input_shape = c(87808)) %>%
+   layer_dropout(rate = 0.4) %>%
+   layer_dense(units = 128, activation = "relu") %>%
+   layer_dropout(rate = 0.5) %>%
+   layer_dense(units = 2, activation = "softmax")
+```
+```{r}
+# Compile the model
+modelnew %>% compile(
+  loss = "binary_crossentropy",
+  optimizer = "adam",
+  metrics = c("accuracy")
+)
+```
+
+```{r}
+system.time(
+   history <- modelnew %>%
+#     fit(x_train, y_train, epochs = 30, batch_size = 128,
+      fit(x_train, y_train, epochs = 10, batch_size = 128,
+        validation_split = 0.2)
+ )
+plot(history)
+```
+```{r}
+# Evaluate the model on the test data
+metrics <- modelnew %>% evaluate(x_test, y_test)
+
+# Extract the accuracy metric
+accuracy <- metrics[[2]]
+accuracy
+# Calculate test error
+test_error <- 1 - accuracy
+test_error
+```
+
+
+```{r}
+system.time(
+   history <- modelnew %>%
+#     fit(x_train, y_train, epochs = 30, batch_size = 128,
+      fit(x_train, y_train, epochs = 20, batch_size = 128,
+        validation_split = 0.2)
+ )
+plot(history)
+```
+```{r}
+# Evaluate the model on the test data
+metrics <- modelnew %>% evaluate(x_test, y_test)
+
+# Extract the accuracy metric
+accuracy <- metrics[[2]]
+accuracy
+# Calculate test error
+test_error <- 1 - accuracy
+test_error
+```
+
+
+```{r}
+# Make predictions on the test dataset
+y_pred_probs <- predict(modelnew, x_test)
+y_pred <- apply(y_pred_probs, 1, which.max)
+
+# Convert the predicted classes into species labels
+species_labels <- c( "bkcchi","norfli")
+predicted_species <- species_labels[y_pred]
+
+# Convert the true test labels to categorical labels
+true_species <- factor(max.col(y_test) - 1, levels = 0:(length(species_labels)-1), labels = species_labels)
+
+# Calculate accuracy for each species
+accuracy <- rep(0, length(species_labels))
+for (i in 1:length(species_labels)) {
+  accuracy[i] <- sum(predicted_species[true_species == species_labels[i]] == species_labels[i]) / sum(true_species == species_labels[i])
+}
+
+# Print accuracy for each species
+for (i in 1:length(species_labels)) {
+  cat("Accuracy for", species_labels[i], ":", accuracy[i], "\n")
+}
+
+```
+
+```{r}
+# Create a custom plot
+plot(history$metrics$loss, type = "l", col = "pink", xlab = "Epoch", ylab = "Loss", ylim = c(0, max(history$metrics$loss, history$metrics$val_loss)))
+lines(history$metrics$val_loss, col = "green")
+legend("topright", legend = c("Training Loss", "Validation Loss"), col = c("pink", "green"), lty = 1)
+
+# Add a title
+title(main = "Training and Validation Metrics for two bird species")
+# Create a custom plot for accuracy
+plot(history$metrics$accuracy, type = "l", col = "pink", xlab = "Epoch", ylab = "Accuracy", ylim = c(0, max(history$metrics$accuracy, history$metrics$val_accuracy)))
+lines(history$metrics$val_accuracy, col = "green")
+legend("bottomright", legend = c("Training Accuracy", "Validation Accuracy"), col = c("pink", "green"), lty = 1)
+
+# Add a title
+title(main = "Training and Validation Accuracy for two bird species")
+
+```
+Changing drop-out layer helped the accuracy, however the black capped chickadee accuracy was a lower by 10%. However the overall model performed a lot better than the previous. 
+
+
+12 class model:
+Loading in all birds:
+```{r}
+# American Crow
+amecro <- load("~/DATA 5322/spectrograms/amecro.dat")
+amecro = species 
+# Barn Swallow 
+barswa <- load("~/DATA 5322/spectrograms/barswa.dat")
+barswa = species 
+#Black-capped Chickadee
+bkcchi <- load("~/DATA 5322/spectrograms/bkcchi.dat")
+bkcchi = species 
+# Blue Jay 
+blujay <- load("~/DATA 5322/spectrograms/blujay.dat")
+blujay = species 
+# Dark-eyed Junco
+daejun <- load("~/DATA 5322/spectrograms/daejun.dat")
+daejun = species
+# House Finch 
+houfin <- load("~/DATA 5322/spectrograms/houfin.dat")
+houfin = species
+# Mallard
+mallar3 <- load("~/DATA 5322/spectrograms/mallar3.dat")
+mallar3 = species
+#Northern Flicker 
+norfli <- load("~/DATA 5322/spectrograms/norfli.dat")
+norfli = species 
+# Red-winged Blackbird 
+rewbla <- load("~/DATA 5322/spectrograms/rewbla.dat")
+rewbla = species
+# Stellers jay 
+stejay <- load("~/DATA 5322/spectrograms/stejay.dat")
+stejay = species 
+# Western meadowlark
+wesmea <- load("~/DATA 5322/spectrograms/wesmea.dat")
+wesmea = species 
+# White-crowned Sparrow
+whcspa <- load("~/DATA 5322/spectrograms/whcspa.dat")
+whcspa = species 
+```
+
+Putting all of them together:
+```{r}
+# Concatenate all the spectrograms along the first dimension (rows)
+x <- abind(amecro, barswa, bkcchi, blujay, daejun, houfin, mallar3, norfli, rewbla, stejay, wesmea, whcspa, along = 1)
+
+# Create labels for the concatenated spectrograms
+y <- c(rep('amecro', dim(amecro)[1]), rep('barswa', dim(barswa)[1]), rep('bkcchi', dim(bkcchi)[1]),
+       rep('blujay', dim(blujay)[1]), rep('daejun', dim(daejun)[1]), rep('houfin', dim(houfin)[1]),
+       rep('mallar3', dim(mallar3)[1]), rep('norfli', dim(norfli)[1]), rep('rewbla', dim(rewbla)[1]),
+       rep('stejay', dim(stejay)[1]), rep('wesmea', dim(wesmea)[1]), rep('whcspa', dim(whcspa)[1]))
+
+```
+
+Processing:
+```{r}
+# Reshape the data arrays
+x <- array_reshape(x, c(nrow(x), 87808))
+y_factor <- factor(y, levels = c('amecro', 'barswa', 'bkcchi', 'blujay', 'daejun', 'houfin',
+                                'mallar3', 'norfli', 'rewbla', 'stejay', 'wesmea', 'whcspa'))
+y_encode <- to_categorical(as.integer(y_factor) - 1, num_classes = 12)
+```
+Training and test set:
+```{r}
+# Set a seed for reproducibility
+set.seed(42)
+
+# Generate random indices for the train and test sets
+n <- nrow(x)
+train_idx <- sample(n, floor(0.7 * n))
+
+# Split the data into training and test sets
+x_train <- x[train_idx, ]
+y_train <- y_encode[train_idx, ]
+x_test <- x[-train_idx, ]
+y_test <- y_encode[-train_idx, ]
+
+```
+Scaling:
+```{r}
+x_train <- x_train / 255
+x_test <- x_test / 255
+```
+Model:
+```{r}
+model2 <- keras_model_sequential()
+model2 %>%
+   layer_dense(units = 256, activation = "relu",
+       input_shape = c(87808)) %>%
+   layer_dropout(rate = 0.4) %>%
+   layer_dense(units = 128, activation = "relu") %>%
+   layer_dropout(rate = 0.3) %>%
+   layer_dense(units = 12, activation = "softmax")
+```
+```{r}
+summary(model2)
+```
+
+```{r}
+model2 %>% compile(loss = "categorical_crossentropy",
+    optimizer = "adam", metrics = c("accuracy")
+  )
+```
+
+
+```{r}
+system.time(
+   history <- model2 %>%
+#     fit(x_train, y_train, epochs = 30, batch_size = 128,
+      fit(x_train, y_train, epochs = 20, batch_size = 128,
+        validation_split = 0.2)
+ )
+plot(history)
+```
+
+
+```{r}
+# Create a custom plot
+plot(history$metrics$loss, type = "l", col = "pink", xlab = "Epoch", ylab = "Loss", ylim = c(0, max(history$metrics$loss, history$metrics$val_loss)))
+lines(history$metrics$val_loss, col = "green")
+legend("topright", legend = c("Training Loss", "Validation Loss"), col = c("pink", "green"), lty = 1)
+
+# Add a title
+title(main = "Training and Validation Metrics for 12 bird species")
+# Create a custom plot for accuracy
+plot(history$metrics$accuracy, type = "l", col = "pink", xlab = "Epoch", ylab = "Accuracy", ylim = c(0, max(history$metrics$accuracy, history$metrics$val_accuracy)))
+lines(history$metrics$val_accuracy, col = "green")
+legend("bottomright", legend = c("Training Accuracy", "Validation Accuracy"), col = c("pink", "green"), lty = 1)
+
+# Add a title
+title(main = "Training and Validation Accuracy for 12 bird species")
+
+```
+
+```{r}
+# Evaluate the model on the test data
+metrics <- model2 %>% evaluate(x_test, y_test)
+
+# Extract the accuracy metric
+accuracy <- metrics[[2]]
+accuracy
+# Calculate test error
+test_error <- 1 - accuracy
+test_error
+```
+
+
+```{r}
+# Make predictions on the test dataset
+y_pred_probs <- predict(model2, x_test)
+y_pred <- apply(y_pred_probs, 1, which.max)
+
+# Convert the predicted classes into species labels
+species_labels <- c("amecro", "barswa", "bkcchi", "blujay", "daejun", "houfin", "mallar3", "norfli", "rewbla", "stejay", "wesmea", "whcspa")
+predicted_species <- species_labels[y_pred]
+
+# Convert the true test labels to categorical labels
+true_species <- factor(max.col(y_test) - 1, levels = 0:(length(species_labels)-1), labels = species_labels)
+
+# Calculate accuracy for each species
+accuracy <- rep(0, length(species_labels))
+for (i in 1:length(species_labels)) {
+  accuracy[i] <- sum(predicted_species[true_species == species_labels[i]] == species_labels[i]) / sum(true_species == species_labels[i])
+}
+
+# Print accuracy for each species
+for (i in 1:length(species_labels)) {
+  cat("Accuracy for", species_labels[i], ":", accuracy[i], "\n")
+}
+
+```
+
+Changing epochs to size 30:
+
+```{r}
+system.time(
+   history <- model2 %>%
+     fit(x_train, y_train, epochs = 30, batch_size = 128,
+      #fit(x_train, y_train, epochs = 20, batch_size = 128,
+        validation_split = 0.2)
+ )
+plot(history)
+```
+```{r}
+# Create a custom plot
+plot(history$metrics$loss, type = "l", col = "pink", xlab = "Epoch", ylab = "Loss", ylim = c(0, max(history$metrics$loss, history$metrics$val_loss)))
+lines(history$metrics$val_loss, col = "green")
+legend("topright", legend = c("Training Loss", "Validation Loss"), col = c("pink", "green"), lty = 1)
+
+# Add a title
+title(main = "Training and Validation Metrics for 12 bird species")
+# Create a custom plot for accuracy
+plot(history$metrics$accuracy, type = "l", col = "pink", xlab = "Epoch", ylab = "Accuracy", ylim = c(0, max(history$metrics$accuracy, history$metrics$val_accuracy)))
+lines(history$metrics$val_accuracy, col = "green")
+legend("bottomright", legend = c("Training Accuracy", "Validation Accuracy"), col = c("pink", "green"), lty = 1)
+
+# Add a title
+title(main = "Training and Validation Accuracy for 12 bird species")
+
+```
+```{r}
+# Evaluate the model on the test data
+metrics <- model2 %>% evaluate(x_test, y_test)
+
+# Extract the accuracy metric
+accuracy <- metrics[[2]]
+accuracy
+# Calculate test error
+test_error <- 1 - accuracy
+test_error
+```
+
+
+```{r}
+# Make predictions on the test dataset
+y_pred_probs <- predict(model2, x_test)
+y_pred <- apply(y_pred_probs, 1, which.max)
+
+# Convert the predicted classes into species labels
+species_labels <- c("amecro", "barswa", "bkcchi", "blujay", "daejun", "houfin", "mallar3", "norfli", "rewbla", "stejay", "wesmea", "whcspa")
+predicted_species <- species_labels[y_pred]
+
+# Convert the true test labels to categorical labels
+true_species <- factor(max.col(y_test) - 1, levels = 0:(length(species_labels)-1), labels = species_labels)
+
+# Calculate accuracy for each species
+accuracy <- rep(0, length(species_labels))
+for (i in 1:length(species_labels)) {
+  accuracy[i] <- sum(predicted_species[true_species == species_labels[i]] == species_labels[i]) / sum(true_species == species_labels[i])
+}
+
+# Print accuracy for each species
+for (i in 1:length(species_labels)) {
+  cat("Accuracy for", species_labels[i], ":", accuracy[i], "\n")
+}
+
+```
+
