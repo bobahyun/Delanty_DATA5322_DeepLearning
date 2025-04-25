@@ -1,6 +1,5 @@
-# Delanty_DATA5322_DeepLearning
+# Classifying Bird Species Sounds from Seattle 
 ## Author: Ava Delanty 
-## Classifying Bird Species Sounds from Seattle 
 
 This project focuses on training neural networks to recognize the sounds of birds commonly found in the Seattle area. The dataset used for this study was sourced from the Birdcall competition data, originally obtained from Xeno-Canto, a crowd-sourced archive of bird sounds. This study covers machine learning topics of neural networks and the use of spectrograms. A binary classification model was built predicting the two bird species the black-capped chickadee and the northern flicker. Additionally, a multilayer neural network was built to classify 12 bird species including the American crow, barn swallow, black-capped chickadee, blue jay, dark-eyed junco, house finch, mallard, northern flicker, red-winged blackbird, Steller's jay, western meadowlark, and white-crowned sparrow. The binary classification model achieved an accuracy of 70% in accurately predicting the black-capped chickadee and 92.58% for the northern flicker, based on all the test samples.  The final classification model demonstrated the ability to predict the majority of bird species with an accuracy above 50%. However, certain species such as the black-capped chickadee, blue jay, red-winged blackbird, and western meadowlark achieved accuracies ranging from 10% to 30%. This study underscores the importance of the trial and error process in developing a neural network for species prediction based on sounds.
 
